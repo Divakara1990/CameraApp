@@ -2,49 +2,58 @@
 //  CameraController.swift
 //  AV Foundation
 //
-//  Created by Pranjal Satija on 5/22/17.
-//  Copyright © 2017 Pranjal Satija. All rights reserved.
+//  Created by suresh on 06/06/17.
 //
 
-import AVFoundation
+import Foundation
 import UIKit
+import AVFoundation
 
 class CameraController: NSObject {
+    
     var captureSession: AVCaptureSession?
     
-    var currentCameraPosition: CameraPosition?
-    
-    var flashMode = AVCaptureFlashMode.off
-    
     var frontCamera: AVCaptureDevice?
-    var frontCameraInput: AVCaptureDeviceInput?
+    var rearCamera: AVCaptureDevice?
     
-    var photoCaptureCompletionBlock: ((UIImage?, Error?) -> Void)?
+    var currentCameraPosition: CameraPosition?
+    var frontCameraInput: AVCaptureDeviceInput?
+    var rearCameraInput: AVCaptureDeviceInput?
     
     var photoOutput: AVCapturePhotoOutput?
     
     var previewLayer: AVCaptureVideoPreviewLayer?
     
-    var rearCamera: AVCaptureDevice?
-    var rearCameraInput: AVCaptureDeviceInput?
+    var flashMode = AVCaptureFlashMode.off
+    
+    var photoCaptureCompletionBlock: ((UIImage?, Error?) -> Void)?
 }
 
-extension CameraController {
-    func prepare(completionHandler: @escaping (Error?) -> Void) {
-        func createCaptureSession() {
+extension CameraController: AVCapturePhotoCaptureDelegate {
+    
+    func prepare(completionHandler: @escaping (Error?) -> Void)
+    {
+        
+        func createCaptureSession()
+        {
             self.captureSession = AVCaptureSession()
         }
         
-        func configureCaptureDevices() throws {
+        func configreCaptureDevices() throws
+        {
+            //1
             let session = AVCaptureDeviceDiscoverySession(deviceTypes: [.builtInWideAngleCamera], mediaType: AVMediaTypeVideo, position: .unspecified)
-            guard let cameras = (session?.devices.flatMap { $0 }), !cameras.isEmpty else { throw CameraControllerError.noCamerasAvailable }
-            
-            for camera in cameras {
-                if camera.position == .front {
+            guard let cameras = (session?.devices.flatMap { $0 }), !cameras.isEmpty else { throw CameraControllerError.noCamerasAvailable}
+            //2
+            for camera in cameras
+            {
+                if camera.position == .front
+                {
                     self.frontCamera = camera
                 }
                 
-                if camera.position == .back {
+                if camera.position == .back
+                {
                     self.rearCamera = camera
                     
                     try camera.lockForConfiguration()
@@ -54,75 +63,71 @@ extension CameraController {
             }
         }
         
-        func configureDeviceInputs() throws {
-            guard let captureSession = self.captureSession else { throw CameraControllerError.captureSessionIsMissing }
-            
-            if let rearCamera = self.rearCamera {
+        func configureDeviceInputs() throws
+        {
+            //3
+            guard let captureSession = self.captureSession else {throw CameraControllerError.capatureSessionIsMissing}
+            //4
+            if let rearCamera = self.rearCamera
+            {
                 self.rearCameraInput = try AVCaptureDeviceInput(device: rearCamera)
-                
-                if captureSession.canAddInput(self.rearCameraInput!) { captureSession.addInput(self.rearCameraInput!) }
-                
+                if captureSession.canAddInput(self.rearCameraInput!){captureSession.addInput(self.rearCameraInput!)}
                 self.currentCameraPosition = .rear
             }
-                
-            else if let frontCamera = self.frontCamera {
+            else if let frontCamera = self.frontCamera
+            {
                 self.frontCameraInput = try AVCaptureDeviceInput(device: frontCamera)
-                
-                if captureSession.canAddInput(self.frontCameraInput!) { captureSession.addInput(self.frontCameraInput!) }
-                else { throw CameraControllerError.inputsAreInvalid }
-                
+                if captureSession.canAddInput(self.frontCameraInput!) { captureSession.addInput(self.frontCameraInput!)}
+                else { throw CameraControllerError.inputsAreInvalid}
                 self.currentCameraPosition = .front
             }
-                
-            else { throw CameraControllerError.noCamerasAvailable }
+            else
+            {
+                throw CameraControllerError.noCamerasAvailable
+            }
         }
         
-        func configurePhotoOutput() throws {
-            guard let captureSession = self.captureSession else { throw CameraControllerError.captureSessionIsMissing }
-            
+        func configurePhotoOutput() throws
+        {
+            guard let captureSession = self.captureSession else {throw CameraControllerError.capatureSessionIsMissing}
             self.photoOutput = AVCapturePhotoOutput()
-            self.photoOutput!.setPreparedPhotoSettingsArray([AVCapturePhotoSettings(format: [AVVideoCodecKey : AVVideoCodecJPEG])], completionHandler: nil)
+            self.photoOutput!.setPreparedPhotoSettingsArray([AVCapturePhotoSettings(format:[AVVideoCodecKey : AVVideoCodecJPEG])], completionHandler: nil)
             
-            if captureSession.canAddOutput(self.photoOutput) { captureSession.addOutput(self.photoOutput) }
+            if captureSession.canAddOutput(self.photoOutput)
+            {
+                captureSession.addOutput(self.photoOutput)
+            }
+            
             captureSession.startRunning()
-        }
+         }
         
-        DispatchQueue(label: "prepare").async {
+         DispatchQueue(label: "prepare").async
+         {
             do {
-                createCaptureSession()
-                try configureCaptureDevices()
-                try configureDeviceInputs()
-                try configurePhotoOutput()
-            }
+                 createCaptureSession()
+                 try configreCaptureDevices()
+                 try configureDeviceInputs()
+                 try configurePhotoOutput()
+               }
             
-            catch {
-                DispatchQueue.main.async {
+               catch
+               {
+                  DispatchQueue.main.async
+                  {
                     completionHandler(error)
+                  }
+                  return
                 }
-                
-                return
-            }
             
-            DispatchQueue.main.async {
-                completionHandler(nil)
-            }
-        }
-    }
-}
-
-extension CameraController {
-    func captureImage(completion: @escaping (UIImage?, Error?) -> Void) {
-        guard let captureSession = captureSession, captureSession.isRunning else { completion(nil, CameraControllerError.captureSessionIsMissing); return }
-        
-        let settings = AVCapturePhotoSettings()
-        settings.flashMode = self.flashMode
-        
-        self.photoOutput?.capturePhoto(with: settings, delegate: self)
-        self.photoCaptureCompletionBlock = completion
-    }
+                 DispatchQueue.main.async
+                 {
+                    completionHandler(nil)
+                 }
+         }
+   }
     
     func displayPreview(on view: UIView) throws {
-        guard let captureSession = self.captureSession, captureSession.isRunning else { throw CameraControllerError.captureSessionIsMissing }
+        guard let captureSession = self.captureSession, captureSession.isRunning else { throw CameraControllerError.capatureSessionIsMissing }
         
         self.previewLayer = AVCaptureVideoPreviewLayer(session: captureSession)
         self.previewLayer?.videoGravity = AVLayerVideoGravityResizeAspectFill
@@ -133,8 +138,10 @@ extension CameraController {
     }
     
     func switchCameras() throws {
-        guard let currentCameraPosition = currentCameraPosition, let captureSession = self.captureSession, captureSession.isRunning else { throw CameraControllerError.captureSessionIsMissing }
         
+        //5
+        guard let currentCameraPosition = currentCameraPosition, let captureSession = self.captureSession, captureSession.isRunning else {throw CameraControllerError.capatureSessionIsMissing}
+        //6
         captureSession.beginConfiguration()
         
         func switchToFrontCamera() throws {
@@ -151,11 +158,8 @@ extension CameraController {
                 self.currentCameraPosition = .front
             }
                 
-            else {
-                throw CameraControllerError.invalidOperation
-            }
+            else { throw CameraControllerError.invalidOperation }
         }
-        
         func switchToRearCamera() throws {
             guard let inputs = captureSession.inputs as? [AVCaptureInput], let frontCameraInput = self.frontCameraInput, inputs.contains(frontCameraInput),
                 let rearCamera = self.rearCamera else { throw CameraControllerError.invalidOperation }
@@ -173,19 +177,27 @@ extension CameraController {
             else { throw CameraControllerError.invalidOperation }
         }
         
-        switch currentCameraPosition {
+        //7
+        switch currentCameraPosition{
         case .front:
             try switchToRearCamera()
-        
         case .rear:
             try switchToFrontCamera()
         }
-        
+        //8
         captureSession.commitConfiguration()
     }
-}
-
-extension CameraController: AVCapturePhotoCaptureDelegate {
+    
+    func captureImage(completion: @escaping (UIImage?, Error?) -> Void){
+        guard let captureSession = captureSession, captureSession.isRunning else { completion(nil, CameraControllerError.capatureSessionIsMissing); return}
+        
+        let settings = AVCapturePhotoSettings()
+        settings.flashMode = self.flashMode
+        
+        self.photoOutput?.capturePhoto(with: settings, delegate: self)
+        self.photoCaptureCompletionBlock = completion
+    }
+    
     public func capture(_ captureOutput: AVCapturePhotoOutput, didFinishProcessingPhotoSampleBuffer photoSampleBuffer: CMSampleBuffer?, previewPhotoSampleBuffer: CMSampleBuffer?,
                         resolvedSettings: AVCaptureResolvedPhotoSettings, bracketSettings: AVCaptureBracketedStillImageSettings?, error: Swift.Error?) {
         if let error = error { self.photoCaptureCompletionBlock?(nil, error) }
@@ -197,22 +209,22 @@ extension CameraController: AVCapturePhotoCaptureDelegate {
         }
             
         else {
-            self.photoCaptureCompletionBlock?(nil, CameraControllerError.unknown)
+            self.photoCaptureCompletionBlock?(nil, CameraControllerError.unKnown)
         }
     }
 }
 
-extension CameraController {
-    enum CameraControllerError: Swift.Error {
+extension CameraController{
+    enum CameraControllerError: Swift.Error{
         case captureSessionAlreadyRunning
-        case captureSessionIsMissing
+        case capatureSessionIsMissing
         case inputsAreInvalid
         case invalidOperation
         case noCamerasAvailable
-        case unknown
+        case unKnown
     }
     
-    public enum CameraPosition {
+    public enum CameraPosition{
         case front
         case rear
     }
